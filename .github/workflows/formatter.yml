@@ -1,0 +1,49 @@
+name: Apply ruff
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run ruff
+        working-directory: src
+        run: |
+          uv sync --dev
+          uv run ruff format . --line-length 120
+          uv run ruff check . --fix --line-length 120
+
+      - name: Check for modified files
+        run: |
+          if git diff --quiet; then
+            echo "modified=false" >> $GITHUB_ENV
+          else
+            echo "modified=true" >> $GITHUB_ENV
+          fi
+
+      - name: Push changes
+        if: env.modified == 'true'
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'noreply@github.com'
+          git add .
+          git commit -m "Automated fixes"
+          git push origin HEAD:${{ github.ref_name }}
